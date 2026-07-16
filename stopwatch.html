@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Stopwatch + Analog Clock</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --accent:#06b6d4;
+    --muted:#94a3b8;
+    --green:#16a34a;
+    --red:#ef4444;
+    --glass: rgba(255,255,255,0.03);
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#e6eef6;background:linear-gradient(180deg,#071029 0%, #071a2a 100%);display:flex;align-items:center;justify-content:center;}
+  .container{width:95%;max-width:1100px;background:var(--card);border-radius:12px;padding:18px;box-shadow:0 8px 30px rgba(2,6,23,0.6);display:flex;gap:18px;align-items:stretch;}
+  /* Left 60% and right 40% */
+  .left{flex:0 0 60%;padding:18px;background:var(--glass);border-radius:10px;display:flex;flex-direction:column;gap:12px;}
+  .right{flex:0 0 40%;padding:18px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+  /* Digital display */
+  .display{font-variant-numeric:tabular-nums;background:rgba(0,0,0,0.25);padding:18px;border-radius:8px;color:#dff6ff;font-size:2.2rem;text-align:center;letter-spacing:1px;border:1px solid rgba(255,255,255,0.03);}
+  .display .ms{font-size:1.1rem;opacity:0.85;margin-left:8px;}
+  /* Buttons */
+  .controls{display:flex;gap:10px;flex-wrap:wrap;}
+  button{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);color:#e6eef6;padding:10px 14px;border-radius:8px;font-weight:600;cursor:pointer;transition:transform .08s ease, box-shadow .08s ease;}
+  button:active{transform:translateY(1px);}
+  .btn-start{background:linear-gradient(180deg,#10b981,#059669);box-shadow:0 6px 18px rgba(16,185,129,0.12);}
+  .btn-stop{background:linear-gradient(180deg,#ef4444,#dc2626);box-shadow:0 6px 18px rgba(239,68,68,0.12);}
+  .btn-lap{background:linear-gradient(180deg,#0ea5e9,#0284c7);box-shadow:0 6px 18px rgba(14,165,233,0.08);}
+  .btn-reset{background:linear-gradient(180deg,#64748b,#475569);box-shadow:0 6px 18px rgba(71,85,105,0.06);}
+  /* Lap list */
+  .laps{max-height:220px;overflow:auto;padding:8px;border-radius:8px;background:rgba(0,0,0,0.12);border:1px solid rgba(255,255,255,0.02);}
+  .lap-item{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px dashed rgba(255,255,255,0.02);color:var(--muted);font-size:0.95rem;}
+  /* Analog clock */
+  .analog{width:260px;height:260px;border-radius:50%;background:radial-gradient(circle at 30% 20%, rgba(255,255,255,0.02), transparent 20%), linear-gradient(180deg,#071a2a,#02101a);box-shadow:inset 0 6px 20px rgba(0,0,0,0.6), 0 8px 30px rgba(2,6,23,0.6);position:relative;display:flex;align-items:center;justify-content:center;}
+  .tick{position:absolute;width:2px;height:12px;background:rgba(255,255,255,0.06);transform-origin:center bottom;}
+  .tick.hour{height:18px;width:3px;background:rgba(255,255,255,0.12);}
+  .hand{position:absolute;left:50%;top:50%;transform-origin:50% 100%;transform:translateX(-50%) translateY(-100%) rotate(0deg);border-radius:4px;}
+  .hand.hour{width:6px;height:70px;background:#e6eef6;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,0.6);}
+  .hand.minute{width:4px;height:95px;background:#cfeff6;z-index:2;}
+  .hand.second{width:2px;height:110px;background:#ff6b6b;z-index:4;}
+  .center-dot{position:absolute;width:12px;height:12px;background:#e6eef6;border-radius:50%;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,0.6);}
+  /* Numbers inside clock */
+  .num{position:absolute;left:50%;top:50%;transform-origin:center center;color:#dbeffd;font-weight:700;font-size:1.05rem;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:5;user-select:none;}
+  .num.small{font-size:0.9rem;width:24px;height:24px;}
+  /* Indicator light */
+  .indicator{display:flex;align-items:center;gap:12px;margin-top:6px;}
+  .radio{width:28px;height:28px;border-radius:50%;background:linear-gradient(180deg,#111827,#0b1220);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.04);box-shadow:inset 0 -4px 10px rgba(0,0,0,0.6);}
+  .light{width:18px;height:18px;border-radius:50%;background:#7f1d1d;box-shadow:0 0 10px rgba(0,0,0,0.6);transition:background .18s ease, box-shadow .18s ease;}
+  .light.green{background:var(--green);box-shadow:0 0 12px rgba(22,163,74,0.35);}
+  .light.red{background:var(--red);box-shadow:0 0 12px rgba(239,68,68,0.35);}
+  .status-text{color:var(--muted);font-size:0.95rem;}
+  /* Responsive */
+  @media (max-width:880px){
+    .container{flex-direction:column;}
+    .left,.right{flex:1 1 auto;width:100%;}
+    .analog{width:220px;height:220px;}
+  }
+  /* Clock ticks */
+.tick {
+  position:absolute;
+  width:2px;
+  height:12px;
+  background:rgba(255,255,255,0.06);
+  transform-origin:center bottom;
+}
+.tick.hour {
+  height:18px;
+  width:3px;
+  background:#32cd32; /* lime green radium-like color */
+  box-shadow:0 0 8px #32cd32, 0 0 15px #32cd32; /* glowing effect */
+  border-radius:2px;
+}
+/* Clock ticks */
+.tick {
+  position:absolute;
+  width:2px;
+  height:12px;
+  transform-origin:center bottom;
+}
+
+/* Hour ticks: radium glow */
+.tick.hour {
+  height:18px;
+  width:3px;
+  background:#32cd32; /* lime green radium-like color */
+  box-shadow:0 0 8px #32cd32, 0 0 15px #32cd32;
+  border-radius:2px;
+}
+
+/* Minute ticks: blinking black/white */
+.tick.minute {
+  background:#000;
+  animation: blinkBW 1s infinite alternate;
+}
+
+@keyframes blinkBW {
+  from { background:#000; }
+  to   { background:#fff; }
+}
+
+</style>
+</head>
+<body>
+  <div class="container" role="application" aria-label="Stopwatch and analog clock">
+    <section class="left" aria-label="Stopwatch section">
+      <div class="display" id="display" aria-live="polite">
+        <span id="dh">00</span>:<span id="dm">00</span>:<span id="ds">00</span><span class="ms">.<span id="dms">000</span></span>
+      </div>
+
+      <div class="controls" role="group" aria-label="Stopwatch controls">
+        <button id="startBtn" class="btn-start">Start</button>
+        <button id="lapBtn" class="btn-lap" disabled>Lap / Save</button>
+        <button id="stopBtn" class="btn-stop" disabled>Stop</button>
+        <button id="resetBtn" class="btn-reset" disabled>Reset</button>
+      </div>
+
+      <div class="indicator" aria-hidden="false">
+        <div class="radio" title="Indicator light">
+          <div id="indicatorLight" class="light red" aria-hidden="true"></div>
+        </div>
+        <div>
+          <div class="status-text" id="statusText">Stopped</div>
+          <div style="font-size:0.85rem;color:var(--muted);">Beep on each second while running</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div style="font-weight:700;color:#cfeff6;margin-bottom:8px;">Laps</div>
+        <div class="laps" id="laps" aria-live="polite" role="list"></div>
+      </div>
+    </section>
+
+    <aside class="right" aria-label="Analog clock section">
+      <div class="analog" id="analogClock" role="img" aria-label="Analog clock showing current time">
+        <!-- ticks, numbers and hands will be injected by JS -->
+        <div class="center-dot"></div>
+        <div class="hand hour" id="hourHand"></div>
+        <div class="hand minute" id="minuteHand"></div>
+        <div class="hand second" id="secondHand"></div>
+      </div>
+      <div style="text-align:center;color:var(--muted);font-size:0.95rem;">Analog clock (real time)</div>
+    </aside>
+  </div>
+
+<script>
+/* -------------------------
+   Stopwatch logic
+   ------------------------- */
+(function(){
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn  = document.getElementById('stopBtn');
+  const lapBtn   = document.getElementById('lapBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const dh = document.getElementById('dh');
+  const dm = document.getElementById('dm');
+  const ds = document.getElementById('ds');
+  const dms = document.getElementById('dms');
+  const lapsContainer = document.getElementById('laps');
+  const indicatorLight = document.getElementById('indicatorLight');
+  const statusText = document.getElementById('statusText');
+
+  let running = false;
+  let startTime = 0;
+  let elapsed = 0; // ms
+  let timerInterval = null;
+  let beepInterval = null;
+  let lapCount = 0;
+
+  // WebAudio beep
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function beep(duration=0.08, frequency=880, volume=0.05){
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = frequency;
+    g.gain.value = volume;
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.start();
+    setTimeout(()=>{ o.stop(); o.disconnect(); g.disconnect(); }, duration*1000);
+  }
+
+  function formatTime(ms){
+    const total = Math.floor(ms);
+    const hours = Math.floor(total / 3600000);
+    const minutes = Math.floor((total % 3600000) / 60000);
+    const seconds = Math.floor((total % 60000) / 1000);
+    const milliseconds = total % 1000;
+    return {
+      h: String(hours).padStart(2,'0'),
+      m: String(minutes).padStart(2,'0'),
+      s: String(seconds).padStart(2,'0'),
+      ms: String(milliseconds).padStart(3,'0')
+    };
+  }
+
+  function updateDisplay(){
+    const t = formatTime(elapsed);
+    dh.textContent = t.h;
+    dm.textContent = t.m;
+    ds.textContent = t.s;
+    dms.textContent = t.ms;
+  }
+
+  function startStopwatch(){
+    if(running) return;
+    // resume or start
+    running = true;
+    startTime = performance.now() - elapsed;
+    timerInterval = setInterval(()=>{
+      elapsed = performance.now() - startTime;
+      updateDisplay();
+    }, 10); // update every 10ms for smooth ms display
+
+    // beep every full second (align to next second)
+    const nextSec = 1000 - (elapsed % 1000);
+    setTimeout(()=> {
+      beep(); // first beep aligned
+      beepInterval = setInterval(()=> beep(), 1000);
+    }, nextSec);
+
+    // UI
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    lapBtn.disabled = false;
+    resetBtn.disabled = false;
+    indicatorLight.classList.remove('red');
+    indicatorLight.classList.add('green');
+    statusText.textContent = 'Running';
+  }
+
+  function stopStopwatch(){
+    if(!running) return;
+    running = false;
+    clearInterval(timerInterval);
+    timerInterval = null;
+    clearInterval(beepInterval);
+    beepInterval = null;
+    elapsed = performance.now() - startTime;
+    updateDisplay();
+
+    // UI
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    lapBtn.disabled = true;
+    resetBtn.disabled = false;
+    indicatorLight.classList.remove('green');
+    indicatorLight.classList.add('red');
+    statusText.textContent = 'Stopped';
+  }
+
+  function resetStopwatch(){
+    running = false;
+    clearInterval(timerInterval);
+    timerInterval = null;
+    clearInterval(beepInterval);
+    beepInterval = null;
+    elapsed = 0;
+    startTime = 0;
+    lapCount = 0;
+    updateDisplay();
+    lapsContainer.innerHTML = '';
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    lapBtn.disabled = true;
+    resetBtn.disabled = true;
+    indicatorLight.classList.remove('green');
+    indicatorLight.classList.add('red');
+    statusText.textContent = 'Stopped';
+  }
+
+  function saveLap(){
+    lapCount++;
+    const t = formatTime(elapsed);
+    const item = document.createElement('div');
+    item.className = 'lap-item';
+    item.setAttribute('role','listitem');
+    item.innerHTML = `<div>Lap ${lapCount}</div><div>${t.h}:${t.m}:${t.s}.${t.ms}</div>`;
+    lapsContainer.prepend(item);
+    // small flash
+    item.style.background = 'linear-gradient(90deg, rgba(16,185,129,0.06), transparent)';
+    setTimeout(()=> item.style.background = 'transparent', 350);
+    // optional short beep
+    beep(0.06, 1200, 0.06);
+  }
+
+  // Attach events
+  startBtn.addEventListener('click', ()=> {
+    // resume audio context on user gesture if suspended
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    startStopwatch();
+  });
+  stopBtn.addEventListener('click', stopStopwatch);
+  resetBtn.addEventListener('click', resetStopwatch);
+  lapBtn.addEventListener('click', saveLap);
+
+  // initialize
+  resetStopwatch();
+})();
+
+/* -------------------------
+   Analog clock (real time) with numbers 1-12
+   ------------------------- */
+(function(){
+  const hourHand = document.getElementById('hourHand');
+  const minuteHand = document.getElementById('minuteHand');
+  const secondHand = document.getElementById('secondHand');
+
+  function updateAnalog(){
+    const now = new Date();
+    const sec = now.getSeconds() + now.getMilliseconds()/1000;
+    const min = now.getMinutes() + sec/60;
+    const hr  = (now.getHours() % 12) + min/60;
+
+    const secDeg = sec * 6; // 360/60
+    const minDeg = min * 6;
+    const hrDeg  = hr * 30; // 360/12
+
+    hourHand.style.transform = `translateX(-50%) translateY(-100%) rotate(${hrDeg}deg)`;
+    minuteHand.style.transform = `translateX(-50%) translateY(-100%) rotate(${minDeg}deg)`;
+    secondHand.style.transform = `translateX(-50%) translateY(-100%) rotate(${secDeg}deg)`;
+    requestAnimationFrame(updateAnalog);
+  }
+
+  // create ticks and numbers
+  const analog = document.getElementById('analogClock');
+
+  // ticks
+  /*for(let i=0;i<60;i++){
+    const t = document.createElement('div');
+    t.className = 'tick' + (i%5===0 ? ' hour' : '');
+    t.style.transform = `rotate(${i*6}deg) translateY(-118px)`;
+    analog.appendChild(t);
+  } */
+ for(let i=0;i<60;i++){
+  const t = document.createElement('div');
+  if(i%5===0){
+    t.className = 'tick hour';
+  } else {
+    t.className = 'tick minute';
+  }
+  t.style.transform = `rotate(${i*6}deg) translateY(-118px)`;
+  analog.appendChild(t);
+}
+
+
+  // numbers 1..12
+  const radius = 92; // distance from center to place numbers
+  for(let n=1;n<=12;n++){
+    const angleDeg = n * 30; // each hour is 30 degrees
+    const num = document.createElement('div');
+    num.className = 'num' + (n%3===0 ? ' small' : '');
+    // position: rotate to angle, translate outward, then counter-rotate so text stays upright
+    num.style.transform = `rotate(${angleDeg}deg) translateY(-${radius}px) rotate(-${angleDeg}deg) translateX(-50%) translateY(-50%)`;
+    num.textContent = String(n);
+    analog.appendChild(num);
+  }
+
+  requestAnimationFrame(updateAnalog);
+})();
+</script>
+</body>
+</html>
